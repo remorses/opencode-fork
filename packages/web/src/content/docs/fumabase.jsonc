@@ -1,0 +1,54 @@
+{
+    // the logo shown in the top left
+    "logo": {
+        "light": "https://uploads.fumabase.com/site/cmcrdub4c0000xkyprd9hcxee/mediaAssets/9b352d59-6b61-4fa9-a580-ba1d18e4b613-ggdwwvmweae9-st.jpeg",
+        "dark": null,
+        "href": null,
+        "text": null
+    },
+    "name": "opencode-fork",
+    "footer": {
+        "links": [
+            {
+                "items": [
+                    {
+                        "href": "https://fumabase.com",
+                        "label": "Fumabase"
+                    }
+                ],
+                "header": "Documentation"
+            }
+        ],
+        "socials": {
+            "github": "https://github.com/remorses",
+            "twitter": "https://x.com/__morse"
+        }
+    },
+    "navbar": {
+        // the links shown in the top right
+        "links": [
+            {
+                "href": "https://fumabase.com",
+                "icon": "document",
+                "label": "Home"
+            }
+        ],
+        // a button shown on the top right
+        "primary": {
+            "href": "https://fumabase.com/login",
+            "type": "button",
+            "label": "Get Started"
+        }
+    },
+    "siteId": "cmcrdub4c0000xkyprd9hcxee",
+    "$schema": "https://fumabase.com/fumabase.json",
+    // to add new domains you can simply add them here, then add a CNAME record pointing to cname.fumabase.com
+    "domains": [
+        "opencode-fork-91jogxuc.localhost",
+        "opencode-fork-91jogxuc.fumabase.com"
+    ],
+    "favicon": {
+        "dark": "/favicon.svg",
+        "light": "/favicon.svg"
+    }
+}
