@@ -64,9 +64,7 @@ export default function Home() {
 
         <section data-component="cta">
           <div data-slot="left">
-            <a href="/docs">
-              Get Started
-            </a>
+            <a href="/docs">Get Started</a>
           </div>
           <div data-slot="right">
             <button data-copy data-slot="command">
@@ -90,7 +88,8 @@ export default function Home() {
               <strong>LSP enabled</strong> Automatically loads the right LSPs for the LLM
             </li>
             <li>
-              <strong>opencode zen</strong> A <a href="/docs/zen">curated list of models</a> provided by opencode <label>New</label>
+              <strong>opencode zen</strong> A <a href="/docs/zen">curated list of models</a> provided by opencode{" "}
+              <label>New</label>
             </li>
             <li>
               <strong>Multi-session</strong> Start multiple agents in parallel on the same project
@@ -113,7 +112,7 @@ export default function Home() {
             <h3 data-component="title">npm</h3>
             <button data-copy data-slot="button">
               <span>
-                npm install -g&nbsp;<strong>opencode-ai</strong>
+                npm install -g <strong>opencode-ai</strong>
               </span>
               <CopyStatus />
             </button>
@@ -122,7 +121,7 @@ export default function Home() {
             <h3 data-component="title">bun</h3>
             <button data-copy data-slot="button">
               <span>
-                bun install -g&nbsp;<strong>opencode-ai</strong>
+                bun install -g <strong>opencode-ai</strong>
               </span>
               <CopyStatus />
             </button>
@@ -131,7 +130,7 @@ export default function Home() {
             <h3 data-component="title">homebrew</h3>
             <button data-copy data-slot="button">
               <span>
-                brew install&nbsp;<strong>sst/tap/opencode</strong>
+                brew install <strong>sst/tap/opencode</strong>
               </span>
               <CopyStatus />
             </button>
@@ -140,7 +139,7 @@ export default function Home() {
             <h3 data-component="title">paru</h3>
             <button data-copy data-slot="button">
               <span>
-                paru -S&nbsp;<strong>opencode-bin</strong>
+                paru -S <strong>opencode-bin</strong>
               </span>
               <CopyStatus />
             </button>
