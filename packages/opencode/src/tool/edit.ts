@@ -599,10 +599,10 @@ export function replace(content: string, oldString: string, newString: string, r
   for (const replacer of [
     SimpleReplacer,
     LineTrimmedReplacer,
-    BlockAnchorReplacer,
     WhitespaceNormalizedReplacer,
     IndentationFlexibleReplacer,
     EscapeNormalizedReplacer,
+    // BlockAnchorReplacer,
     // TrimmedBoundaryReplacer,
     // ContextAwareReplacer,
     // MultiOccurrenceReplacer,
