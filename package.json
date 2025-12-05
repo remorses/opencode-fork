@@ -85,6 +85,7 @@
   ],
   "overrides": {
     "@types/bun": "catalog:",
+    "@opentui/core": "0.0.0-20251205-41c885f6",
     "@types/node": "catalog:"
   }
 }
