@@ -1,10 +1,11 @@
 import { Log } from "../util/log"
 import path from "path"
+import { pathToFileURL } from "url"
 import os from "os"
 import z from "zod"
 import { Filesystem } from "../util/filesystem"
 import { ModelsDev } from "../provider/models"
-import { mergeDeep, pipe } from "remeda"
+import { mergeDeep, pipe, unique } from "remeda"
 import { Global } from "../global"
 import fs from "fs/promises"
 import { lazy } from "../util/lazy"
@@ -75,6 +76,13 @@ export namespace Config {
           stop: Instance.worktree,
         }),
       )),
+      ...(await Array.fromAsync(
+        Filesystem.up({
+          targets: [".opencode"],
+          start: Global.Path.home,
+          stop: Global.Path.home,
+        }),
+      )),
     ]
 
     if (Flag.OPENCODE_CONFIG_DIR) {
@@ -83,7 +91,7 @@ export namespace Config {
     }
 
     const promises: Promise<void>[] = []
-    for (const dir of directories) {
+    for (const dir of unique(directories)) {
       await assertValid(dir)
 
       if (dir.endsWith(".opencode") || dir === Flag.OPENCODE_CONFIG_DIR) {
@@ -210,7 +218,7 @@ export namespace Config {
         result[config.name] = parsed.data
         continue
       }
-      throw new InvalidError({ path: item }, { cause: parsed.error })
+      throw new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error })
     }
     return result
   }
@@ -253,7 +261,7 @@ export namespace Config {
         result[config.name] = parsed.data
         continue
       }
-      throw new InvalidError({ path: item }, { cause: parsed.error })
+      throw new InvalidError({ path: item, issues: parsed.error.issues }, { cause: parsed.error })
     }
     return result
   }
@@ -297,7 +305,7 @@ export namespace Config {
       dot: true,
       cwd: dir,
     })) {
-      plugins.push("file://" + item)
+      plugins.push(pathToFileURL(item).href)
     }
     return plugins
   }
@@ -325,12 +333,33 @@ export namespace Config {
       ref: "McpLocalConfig",
     })
 
+  export const McpOAuth = z
+    .object({
+      clientId: z
+        .string()
+        .optional()
+        .describe("OAuth client ID. If not provided, dynamic client registration (RFC 7591) will be attempted."),
+      clientSecret: z.string().optional().describe("OAuth client secret (if required by the authorization server)"),
+      scope: z.string().optional().describe("OAuth scopes to request during authorization"),
+    })
+    .strict()
+    .meta({
+      ref: "McpOAuthConfig",
+    })
+  export type McpOAuth = z.infer<typeof McpOAuth>
+
   export const McpRemote = z
     .object({
       type: z.literal("remote").describe("Type of MCP server connection"),
       url: z.string().describe("URL of the remote MCP server"),
       enabled: z.boolean().optional().describe("Enable or disable the MCP server on startup"),
       headers: z.record(z.string(), z.string()).optional().describe("Headers to send with the request"),
+      oauth: z
+        .union([McpOAuth, z.literal(false)])
+        .optional()
+        .describe(
+          "OAuth authentication configuration for the MCP server. Set to false to disable OAuth auto-detection.",
+        ),
       timeout: z
         .number()
         .int()
@@ -411,6 +440,8 @@ export namespace Config {
       session_new: z.string().optional().default("<leader>n").describe("Create a new session"),
       session_list: z.string().optional().default("<leader>l").describe("List all sessions"),
       session_timeline: z.string().optional().default("<leader>g").describe("Show session timeline"),
+      session_fork: z.string().optional().default("none").describe("Fork session from message"),
+      session_rename: z.string().optional().default("none").describe("Rename session"),
       session_share: z.string().optional().default("none").describe("Share current session"),
       session_unshare: z.string().optional().default("none").describe("Unshare current session"),
       session_interrupt: z.string().optional().default("escape").describe("Interrupt current session"),
@@ -425,6 +456,8 @@ export namespace Config {
         .describe("Scroll messages down by half page"),
       messages_first: z.string().optional().default("ctrl+g,home").describe("Navigate to first message"),
       messages_last: z.string().optional().default("ctrl+alt+g,end").describe("Navigate to last message"),
+      messages_next: z.string().optional().default("none").describe("Navigate to next message"),
+      messages_previous: z.string().optional().default("none").describe("Navigate to previous message"),
       messages_last_user: z.string().optional().default("none").describe("Navigate to last user message"),
       messages_copy: z.string().optional().default("<leader>y").describe("Copy message"),
       messages_undo: z.string().optional().default("<leader>u").describe("Undo message"),
@@ -438,20 +471,99 @@ export namespace Config {
       model_list: z.string().optional().default("<leader>m").describe("List available models"),
       model_cycle_recent: z.string().optional().default("f2").describe("Next recently used model"),
       model_cycle_recent_reverse: z.string().optional().default("shift+f2").describe("Previous recently used model"),
+      model_cycle_favorite: z.string().optional().default("none").describe("Next favorite model"),
+      model_cycle_favorite_reverse: z.string().optional().default("none").describe("Previous favorite model"),
       command_list: z.string().optional().default("ctrl+p").describe("List available commands"),
       agent_list: z.string().optional().default("<leader>a").describe("List agents"),
       agent_cycle: z.string().optional().default("tab").describe("Next agent"),
       agent_cycle_reverse: z.string().optional().default("shift+tab").describe("Previous agent"),
       input_clear: z.string().optional().default("ctrl+c").describe("Clear input field"),
-      input_forward_delete: z.string().optional().default("ctrl+d").describe("Forward delete"),
       input_paste: z.string().optional().default("ctrl+v").describe("Paste from clipboard"),
       input_submit: z.string().optional().default("return").describe("Submit input"),
-      input_newline: z.string().optional().default("shift+return,ctrl+j").describe("Insert newline in input"),
+      input_newline: z
+        .string()
+        .optional()
+        .default("shift+return,ctrl+return,alt+return,ctrl+j")
+        .describe("Insert newline in input"),
+      input_move_left: z.string().optional().default("left,ctrl+b").describe("Move cursor left in input"),
+      input_move_right: z.string().optional().default("right,ctrl+f").describe("Move cursor right in input"),
+      input_move_up: z.string().optional().default("up").describe("Move cursor up in input"),
+      input_move_down: z.string().optional().default("down").describe("Move cursor down in input"),
+      input_select_left: z.string().optional().default("shift+left").describe("Select left in input"),
+      input_select_right: z.string().optional().default("shift+right").describe("Select right in input"),
+      input_select_up: z.string().optional().default("shift+up").describe("Select up in input"),
+      input_select_down: z.string().optional().default("shift+down").describe("Select down in input"),
+      input_line_home: z.string().optional().default("ctrl+a").describe("Move to start of line in input"),
+      input_line_end: z.string().optional().default("ctrl+e").describe("Move to end of line in input"),
+      input_select_line_home: z
+        .string()
+        .optional()
+        .default("ctrl+shift+a")
+        .describe("Select to start of line in input"),
+      input_select_line_end: z.string().optional().default("ctrl+shift+e").describe("Select to end of line in input"),
+      input_visual_line_home: z.string().optional().default("alt+a").describe("Move to start of visual line in input"),
+      input_visual_line_end: z.string().optional().default("alt+e").describe("Move to end of visual line in input"),
+      input_select_visual_line_home: z
+        .string()
+        .optional()
+        .default("alt+shift+a")
+        .describe("Select to start of visual line in input"),
+      input_select_visual_line_end: z
+        .string()
+        .optional()
+        .default("alt+shift+e")
+        .describe("Select to end of visual line in input"),
+      input_buffer_home: z.string().optional().default("home").describe("Move to start of buffer in input"),
+      input_buffer_end: z.string().optional().default("end").describe("Move to end of buffer in input"),
+      input_select_buffer_home: z
+        .string()
+        .optional()
+        .default("shift+home")
+        .describe("Select to start of buffer in input"),
+      input_select_buffer_end: z.string().optional().default("shift+end").describe("Select to end of buffer in input"),
+      input_delete_line: z.string().optional().default("ctrl+shift+d").describe("Delete line in input"),
+      input_delete_to_line_end: z.string().optional().default("ctrl+k").describe("Delete to end of line in input"),
+      input_delete_to_line_start: z.string().optional().default("ctrl+u").describe("Delete to start of line in input"),
+      input_backspace: z.string().optional().default("backspace,shift+backspace").describe("Backspace in input"),
+      input_delete: z.string().optional().default("ctrl+d,delete,shift+delete").describe("Delete character in input"),
+      input_undo: z.string().optional().default("ctrl+-,super+z").describe("Undo in input"),
+      input_redo: z.string().optional().default("ctrl+.,super+shift+z").describe("Redo in input"),
+      input_word_forward: z
+        .string()
+        .optional()
+        .default("alt+f,alt+right,ctrl+right")
+        .describe("Move word forward in input"),
+      input_word_backward: z
+        .string()
+        .optional()
+        .default("alt+b,alt+left,ctrl+left")
+        .describe("Move word backward in input"),
+      input_select_word_forward: z
+        .string()
+        .optional()
+        .default("alt+shift+f,alt+shift+right")
+        .describe("Select word forward in input"),
+      input_select_word_backward: z
+        .string()
+        .optional()
+        .default("alt+shift+b,alt+shift+left")
+        .describe("Select word backward in input"),
+      input_delete_word_forward: z
+        .string()
+        .optional()
+        .default("alt+d,alt+delete,ctrl+delete")
+        .describe("Delete word forward in input"),
+      input_delete_word_backward: z
+        .string()
+        .optional()
+        .default("ctrl+w,ctrl+backspace,alt+backspace")
+        .describe("Delete word backward in input"),
       history_previous: z.string().optional().default("up").describe("Previous history item"),
       history_next: z.string().optional().default("down").describe("Next history item"),
       session_child_cycle: z.string().optional().default("<leader>right").describe("Next child session"),
       session_child_cycle_reverse: z.string().optional().default("<leader>left").describe("Previous child session"),
       terminal_suspend: z.string().optional().default("ctrl+z").describe("Suspend terminal"),
+      terminal_title_toggle: z.string().optional().default("none").describe("Toggle terminal title"),
     })
     .strict()
     .meta({
@@ -556,6 +668,12 @@ export namespace Config {
         .string()
         .describe("Small model to use for tasks like title generation in the format of provider/model")
         .optional(),
+      default_agent: z
+        .string()
+        .optional()
+        .describe(
+          "Default agent to use when none is specified. Must be a primary agent. Falls back to 'build' if not set or if the specified agent is invalid.",
+        ),
       username: z
         .string()
         .optional()
@@ -570,10 +688,16 @@ export namespace Config {
         .describe("@deprecated Use `agent` field instead."),
       agent: z
         .object({
+          // primary
           plan: Agent.optional(),
           build: Agent.optional(),
+          // subagent
           general: Agent.optional(),
           explore: Agent.optional(),
+          // specialized
+          title: Agent.optional(),
+          summary: Agent.optional(),
+          compaction: Agent.optional(),
         })
         .catchall(Agent)
         .optional()
@@ -685,6 +809,7 @@ export namespace Config {
             .array(z.string())
             .optional()
             .describe("Tools that should only be available to primary agents."),
+          continue_loop_on_deny: z.boolean().optional().describe("Continue the agent loop when a tool call is denied"),
         })
         .optional(),
     })
