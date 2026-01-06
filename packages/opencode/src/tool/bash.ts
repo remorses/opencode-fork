@@ -9,8 +9,8 @@ import { Language } from "web-tree-sitter"
 import { Agent } from "@/agent/agent"
 import { $ } from "bun"
 import { Filesystem } from "@/util/filesystem"
-import { Wildcard } from "@/util/wildcard"
 import { Permission } from "@/permission"
+import { PermissionNext } from "@/permission/next"
 import { fileURLToPath } from "url"
 import { Flag } from "@/flag/flag.ts"
 import path from "path"
@@ -86,20 +86,21 @@ export const BashTool = Tool.define("bash", async () => {
 
       const checkExternalDirectory = async (dir: string) => {
         if (Filesystem.contains(Instance.directory, dir)) return
-        const title = `This command references paths outside of ${Instance.directory}`
-        if (agent.permission.external_directory === "ask") {
+        const msg = `This command references paths outside of ${Instance.directory}`
+        const rule = PermissionNext.evaluate("external_directory", dir, agent.permission)
+        if (rule.action === "ask") {
           await Permission.ask({
             type: "external_directory",
             pattern: [dir, path.join(dir, "*")],
             sessionID: ctx.sessionID,
             messageID: ctx.messageID,
             callID: ctx.callID,
-            title,
+            message: msg,
             metadata: {
               command: params.command,
             },
           })
-        } else if (agent.permission.external_directory === "deny") {
+        } else if (rule.action === "deny") {
           throw new Permission.RejectedError(
             ctx.sessionID,
             "external_directory",
@@ -107,14 +108,12 @@ export const BashTool = Tool.define("bash", async () => {
             {
               command: params.command,
             },
-            `${title} so this command is not allowed to be executed.`,
+            `${msg} so this command is not allowed to be executed.`,
           )
         }
       }
 
       await checkExternalDirectory(cwd)
-
-      const permissions = agent.permission.bash
 
       const askPatterns = new Set<string>()
       for (const node of tree.rootNode.descendantsOfType("command")) {
@@ -159,13 +158,14 @@ export const BashTool = Tool.define("bash", async () => {
 
         // always allow cd if it passes above check
         if (command[0] !== "cd") {
-          const action = Wildcard.allStructured({ head: command[0], tail: command.slice(1) }, permissions)
-          if (action === "deny") {
+          const commandPattern = command.join(" ")
+          const rule = PermissionNext.evaluate("bash", commandPattern, agent.permission)
+          if (rule.action === "deny") {
             throw new Error(
-              `The user has specifically restricted access to this command: "${command.join(" ")}", you are not allowed to execute it. The user has these settings configured: ${JSON.stringify(permissions)}`,
+              `The user has specifically restricted access to this command: "${commandPattern}", you are not allowed to execute it.`,
             )
           }
-          if (action === "ask") {
+          if (rule.action === "ask") {
             const pattern = (() => {
               if (command.length === 0) return
               const head = command[0]
@@ -188,7 +188,7 @@ export const BashTool = Tool.define("bash", async () => {
           sessionID: ctx.sessionID,
           messageID: ctx.messageID,
           callID: ctx.callID,
-          title: params.command,
+          message: params.command,
           metadata: {
             command: params.command,
             patterns,

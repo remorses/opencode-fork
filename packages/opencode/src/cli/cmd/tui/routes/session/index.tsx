@@ -1459,7 +1459,7 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
     const shouldHide =
       !showDetails() &&
       props.part.state.status === "completed" &&
-      !sync.data.permission[props.message.sessionID]?.some((x) => x.callID === props.part.callID)
+      !sync.data.permission[props.message.sessionID]?.some((x) => x.tool?.callID === props.part.callID)
 
     if (shouldHide) {
       return undefined
@@ -1471,7 +1471,7 @@ function ToolPart(props: { last: boolean; part: ToolPart; message: AssistantMess
     const input = props.part.state.input ?? {}
     const container = ToolRegistry.container(props.part.tool)
     const permissions = sync.data.permission[props.message.sessionID] ?? []
-    const permissionIndex = permissions.findIndex((x) => x.callID === props.part.callID)
+    const permissionIndex = permissions.findIndex((x) => x.tool?.callID === props.part.callID)
     const permission = permissions[permissionIndex]
 
     const style: BoxProps =
